@@ -28,7 +28,7 @@ class StreamDiffusionWrapper:
         output_type: Literal["pil", "pt", "np", "latent"] = "pil",
         lcm_lora_id: Optional[str] = None,
         vae_id: Optional[str] = None,
-        device: Literal["cpu", "cuda"] = "cuda",
+        device: Optional[Literal["cpu", "cuda", "mps"]] = None,
         dtype: torch.dtype = torch.float16,
         frame_buffer_size: int = 1,
         width: int = 512,
@@ -133,7 +133,17 @@ class StreamDiffusionWrapper:
                     "img2img mode must use denoising batch for now."
                 )
 
+        # Auto-detect device if not specified
+        if device is None:
+            if torch.cuda.is_available():
+                device = "cuda"
+            elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+                device = "mps"
+            else:
+                device = "cpu"
+        
         self.device = device
+        print(f"Using device: {device}")
         self.dtype = dtype
         self.width = width
         self.height = height
