@@ -158,7 +158,8 @@ class App:
         )
 
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
 torch_dtype = torch.float16
 pipeline = Pipeline(config, device, torch_dtype)
 app = App(config, pipeline).app

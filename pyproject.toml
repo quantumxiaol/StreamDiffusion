@@ -27,6 +27,12 @@ dependencies = [
     "av>=16.0.1",
     "opencv-python>=4.11.0.86",
     "pyqt6>=6.10.0",
+    "controlnet-aux>=0.0.10",
+    "fastapi>=0.123.7",
+    "uvicorn>=0.38.0",
+    "compel==2.0.2",
+    "markdown2>=2.5.4",
+    "websockets>=15.0.1",
 ]
 
 [project.optional-dependencies]
