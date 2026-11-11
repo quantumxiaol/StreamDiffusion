@@ -111,6 +111,38 @@ ls demo/realtime-img2img/frontend/public/index.html
 > 没有模型时 demo 会回退到 Hugging Face 在线下载，但加 `--local-files-only`
 > 会直接报错。
 
+### 如果代码是 GitHub zip 解压的（没有 `.git`）
+
+zip 里没有版本历史。在项目目录执行下面几步，就能变成和 `git clone` 一样的状态：
+
+```bash
+cd StreamDiffusion
+
+git init -b main
+git remote add origin https://github.com/quantumxiaol/StreamDiffusion.git
+git fetch origin
+git reset --hard origin/main
+git branch --set-upstream-to=origin/main main
+
+git status -sb   # 应该显示 ## main...origin/main
+```
+
+`git reset --hard` 会把 tracked 文件对齐到远端 `main`，但**不会删除**：
+
+- `.venv/`
+- `models/`
+- `.env`
+- `engines/`
+
+因为这些都在 `.gitignore` 里，ignored 文件不受 `reset --hard` 影响。
+
+> **不要**执行 `git clean -fdx`，它会连 `.venv` 和 `models` 一起删掉。
+> 如果 `git status` 里有多余的非 ignored 文件，先看清单，再决定是否用
+> `git clean -fd`（不带 `x`）。
+>
+> 如果远端默认分支不叫 `main`，把上面的 `origin/main` 换成 `origin/master`。
+> 如果以后想保留本地修改，先备份再 reset。
+
 ---
 
 ## 3. 安装环境（二选一）
