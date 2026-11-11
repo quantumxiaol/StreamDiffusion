@@ -161,6 +161,33 @@ git restore .
 - **不要**执行 `git clean -fdx`，它会连 `.venv` 和 `models` 一起删掉。
 - 如果远端默认分支不叫 `main`，把 `origin/main` 换成 `origin/master`。
 
+#### Git 版本较老（例如 2.14）
+
+`git init -b main` 需要 Git 2.28+，`git fetch --filter` 需要 2.19+。2.14 用：
+
+```bash
+cd StreamDiffusion
+
+git init
+git symbolic-ref HEAD refs/heads/main
+
+git remote add origin https://github.com/quantumxiaol/StreamDiffusion.git
+git fetch origin                 # 2.14 不支持 --filter，会拉完整历史对象
+git reset origin/main            # mixed：只动 HEAD/index，不覆盖工作区
+git branch --set-upstream-to=origin/main main
+
+git status -sb
+```
+
+- 老版本没有 `git restore`（2.23+）。有差异的文件用
+  `git checkout -- path/to/file`，全部对齐用 `git checkout -- .`。
+- `git fetch origin` 会比 partial clone 多下载对象，但 `git reset` 不会重新
+  checkout 文件，已有工作区仍然是复用的。
+- 想用 `--filter=blob:none` 省流量，先升级 Git：
+  Ubuntu 可以 `sudo add-apt-repository ppa:git-core/ppa && sudo apt update &&
+  sudo apt install git`，或者 `conda install -c conda-forge git`。
+- 如果不确定自己的版本：`git --version`。
+
 ---
 
 ## 3. 安装环境（二选一）
