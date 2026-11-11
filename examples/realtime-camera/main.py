@@ -23,7 +23,7 @@ from utils.device import get_device, get_dtype, resolve_acceleration
 
 # Demo 的默认配置
 base_model = "stabilityai/sd-turbo"
-default_prompt = "Portrait of The Joker halloween costume, face painting, with , glare pose, detailed, intricate, full of colour, cinematic lighting, trending on artstation, 8k, hyperrealistic, focused, extreme details, unreal engine 5 cinematic, masterpiece"
+default_prompt = "Anime style portrait of a girl wearing a Japanese school uniform, sailor collar, pleated skirt, detailed anime illustration, vibrant colors, clean line art, cinematic lighting, masterpiece"
 default_negative_prompt = "black and white, blurry, low resolution, pixelated,  pixel art, low quality, low fidelity"
 
 

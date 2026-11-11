@@ -184,8 +184,14 @@ git status -sb
 - `git fetch origin` 会比 partial clone 多下载对象，但 `git reset` 不会重新
   checkout 文件，已有工作区仍然是复用的。
 - 想用 `--filter=blob:none` 省流量，先升级 Git：
-  Ubuntu 可以 `sudo add-apt-repository ppa:git-core/ppa && sudo apt update &&
+  Ubuntu 可以 `sudo add-apt-repository -y ppa:git-core/ppa && sudo apt update &&
   sudo apt install git`，或者 `conda install -c conda-forge git`。
+- 如果 `which git` 指向 conda（例如 `/opt/conda/bin/git`），即使系统 apt/PPA
+  升级了，shell 仍会用到旧版本。用 `which -a git` 确认，然后在 conda 环境里
+  `conda install -c conda-forge git`，或显式用 `/usr/bin/git`。
+- `sudo add-apt-repository ppa:git-core/ppa` 长时间没有输出时，它可能在等你
+  按回车，或者访问 Launchpad 很慢。先加 `-y` 试；不行就 Ctrl-C，改用 conda，
+  不要卡在这里——上面的 2.14 fallback 已经够用。
 - 如果不确定自己的版本：`git --version`。
 
 ---
@@ -347,9 +353,11 @@ xformers 不是运行 demo 的必需品。
 
 ## 4. 前端
 
-打包时已经带了 `demo/realtime-img2img/frontend/public`，直接启动即可。
+如果是打包部署，`demo/realtime-img2img/frontend/public` 已经带上了，直接启动即可。
 
-如果你把它删了，或者改了前端源码，再构建：
+如果是 **git pull** 部署，注意 `frontend/public` 被
+`demo/realtime-img2img/.gitignore` 忽略，不在 git 里。拉完代码后需要在目标机
+重新构建，或者从 Mac 把构建好的 `public/` 目录 `rsync` 过去：
 
 ```bash
 cd demo/realtime-img2img/frontend
@@ -357,6 +365,9 @@ npm ci
 npm run build
 cd ../..
 ```
+
+需要 Node.js 18+。如果只是改了 Python prompt 或后端，不需要重新构建；
+如果改了 `frontend/src`（比如这次的竖屏上下排列），就必须 rebuild 才会生效。
 
 ---
 

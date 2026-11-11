@@ -113,7 +113,7 @@
     {/if}
   </article>
   {#if pipelineParams}
-    <article class="my-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+    <article class="video-grid my-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
       {#if isImageMode}
         <div class="sm:col-start-1">
           <VideoInput
@@ -148,5 +148,21 @@
 <style lang="postcss">
   :global(html) {
     @apply text-black dark:bg-gray-900 dark:text-white;
+  }
+
+  /* Vertical screens (portrait monitor, kiosk, phone): stack input/output
+     instead of keeping them side by side. */
+  @media (orientation: portrait) {
+    .video-grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .video-grid > div {
+      grid-column: 1 / -1;
+    }
+
+    .video-grid :global(.max-w-lg) {
+      max-width: 40rem;
+    }
   }
 </style>
