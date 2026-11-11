@@ -98,6 +98,29 @@ MPS/CPU instead of printing a traceback.
 To move this demo (with the downloaded models) to an NVIDIA machine, see
 [`DEPLOY-CUDA.md`](../../DEPLOY-CUDA.md). Do not copy the macOS `.venv`.
 
+### Effect strength
+
+The default `t_index_list=[35, 45]` is intentionally subtle: it only applies
+two late, low-noise steps, so the webcam image (and therefore the original
+clothing) is preserved. If the prompt seems to have no effect, this is why.
+
+Use `--t-index` to change it. The **last** index controls how much the current
+frame is changed; lower means stronger. Examples, from subtle to strong:
+
+```bash
+python main.py --t-index 35,45        # default: subtle
+python main.py --t-index 10,20,30,40  # stronger, 4 steps
+python main.py --t-index 0,10,20,30   # much stronger, 4 steps
+```
+
+More steps = lower FPS. On a 2080 Ti, 3 steps such as
+`--t-index 10,20,30` is a reasonable compromise. If you lower
+`--num-inference-steps`, keep the largest `t-index` below it.
+
+> SD-Turbo is a photorealistic model. Strong denoising can make the result
+> stylized, but for a real anime look use an anime fine-tuned SD1.5 model with
+> LCM-LoRA (the `demo/realtime-txt2img` setup) instead of SD-Turbo.
+
 ### Running with Docker
 
 ```bash

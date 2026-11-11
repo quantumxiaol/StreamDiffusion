@@ -60,6 +60,27 @@ def resolve_vae_path(args: Args) -> str:
     return taesd_model
 
 
+def parse_t_index(value: str, num_inference_steps: int) -> list[int]:
+    """Parse --t-index and validate it against the scheduler length."""
+
+    try:
+        indices = sorted({int(part.strip()) for part in value.split(",") if part.strip()})
+    except ValueError as exc:
+        raise SystemExit(
+            f"Invalid --t-index {value!r}; expected comma separated integers, "
+            "e.g. '35,45' or '0,16,32,45'."
+        ) from exc
+    if not indices:
+        raise SystemExit("--t-index must contain at least one index, e.g. '35,45'.")
+    invalid = [index for index in indices if index < 0 or index >= num_inference_steps]
+    if invalid:
+        raise SystemExit(
+            f"--t-index {invalid} is outside [0, {num_inference_steps - 1}]. "
+            "Increase --num-inference-steps or use smaller indices."
+        )
+    return indices
+
+
 default_prompt = "Anime style portrait of a girl wearing a Japanese school uniform, sailor collar, pleated skirt, detailed anime illustration, vibrant colors, clean line art, cinematic lighting, masterpiece"
 default_negative_prompt = "black and white, blurry, low resolution, pixelated,  pixel art, low quality, low fidelity"
 
@@ -112,7 +133,16 @@ class Pipeline:
         params = self.InputParams()
         model_id_or_path = resolve_model_path(args)
         vae_id = resolve_vae_path(args) if args.taesd else None
+        t_index_list = (
+            parse_t_index(args.t_index, args.num_inference_steps)
+            if args.t_index
+            else [35, 45]
+        )
         print(f"Model: {model_id_or_path}")
+        print(
+            f"Denoising: t_index={t_index_list}, "
+            f"num_inference_steps={args.num_inference_steps}"
+        )
         if vae_id is not None:
             print(f"Tiny VAE: {vae_id}")
 
@@ -121,7 +151,7 @@ class Pipeline:
             use_tiny_vae=args.taesd,
             device=device,
             dtype=torch_dtype,
-            t_index_list=[35, 45],
+            t_index_list=t_index_list,
             frame_buffer_size=1,
             width=params.width,
             height=params.height,
@@ -144,7 +174,7 @@ class Pipeline:
         self.stream.prepare(
             prompt=default_prompt,
             negative_prompt=default_negative_prompt,
-            num_inference_steps=50,
+            num_inference_steps=args.num_inference_steps,
             guidance_scale=1.2,
         )
 

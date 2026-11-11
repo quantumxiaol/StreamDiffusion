@@ -22,6 +22,8 @@ class Args(NamedTuple):
     model: str
     vae: str
     local_files_only: bool
+    t_index: str
+    num_inference_steps: int
 
     def pretty_print(self):
         print("\n")
@@ -44,6 +46,9 @@ DTYPE = os.environ.get("DTYPE", "auto")
 # has been downloaded, otherwise it falls back to the Hugging Face model id.
 MODEL = os.environ.get("MODEL_ID") or os.environ.get("MODEL")
 VAE = os.environ.get("VAE_ID") or os.environ.get("VAE")
+# Comma separated scheduler indices; None keeps the demo default [35, 45].
+T_INDEX = os.environ.get("T_INDEX")
+NUM_INFERENCE_STEPS = int(os.environ.get("NUM_INFERENCE_STEPS", 50))
 
 default_host = os.getenv("HOST", "0.0.0.0")
 default_port = int(os.getenv("PORT", "7860"))
@@ -157,6 +162,25 @@ parser.add_argument(
         "Tiny VAE id or local path. Defaults to models/taesd when it exists, "
         "otherwise madebyollin/taesd."
     ),
+)
+parser.add_argument(
+    "--t-index",
+    dest="t_index",
+    type=str,
+    default=T_INDEX,
+    help=(
+        "Comma separated scheduler indices. '35,45' (default) is subtle and "
+        "keeps the webcam image; '10,20,30,40' is stronger; '0,10,20,30' is "
+        "much stronger. The LAST index controls how much the current frame is "
+        "changed (lower = more change)."
+    ),
+)
+parser.add_argument(
+    "--num-inference-steps",
+    dest="num_inference_steps",
+    type=int,
+    default=NUM_INFERENCE_STEPS,
+    help="Scheduler steps used to resolve --t-index (default: 50).",
 )
 parser.add_argument(
     "--local-files-only",
