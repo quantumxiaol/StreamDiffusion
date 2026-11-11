@@ -1,0 +1,4 @@
+# Extra dependencies for the optional PyQt6 desktop camera demo.
+# The web demo (demo/realtime-img2img) does not need these.
+pyqt6>=6.10.0
+opencv-python>=4.11.0.86

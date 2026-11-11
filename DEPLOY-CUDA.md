@@ -156,9 +156,9 @@ uv run python main.py \
 
 注意：
 
-- 打包时必须保留 `uv.lock`。它在 `.gitignore` 里，但 tar 会带上；如果手动删掉，
-  `uv sync --locked` 会报错。
-- `uv sync` 安装的是完整项目（含 PyQt6、torchaudio 等），比
+- `uv.lock` 已随仓库提交，不要删除或排除它；`uv sync --locked` 依赖它。
+  git pull 部署时它也会一起拉下来。
+- `uv sync` 安装的是完整项目（含 torchaudio、opencv、matplotlib 等），比
   `requirements-cuda.txt` 重，但版本和 lock 完全一致。
 - `uv run` 会检查环境；已经 `uv sync` 过之后，也可以用
   `source .venv/bin/activate` 然后直接 `python main.py`。

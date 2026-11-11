@@ -1,3 +1,6 @@
+# Optional PyQt6 desktop camera demo (not used by demo/realtime-img2img).
+# Install its extra dependency first:
+#   pip install -r examples/realtime-camera/requirements.txt
 import os
 import sys
 import time

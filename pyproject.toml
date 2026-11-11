@@ -26,7 +26,6 @@ dependencies = [
     "mss>=10.1.0",
     "av>=16.0.1",
     "opencv-python>=4.11.0.86",
-    "pyqt6>=6.10.0",
     "controlnet-aux>=0.0.10",
     "fastapi>=0.123.7",
     "uvicorn>=0.38.0",
