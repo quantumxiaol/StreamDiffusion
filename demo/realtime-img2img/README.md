@@ -145,6 +145,37 @@ requires HTTPS or `localhost`, so use the SSH tunnel if the demo is remote.
 > The better model choice is an anime fine-tuned SD1.5 checkpoint with
 > LCM-LoRA (the setup used by `demo/realtime-txt2img`).
 
+### Reducing clothing flicker
+
+At stronger settings the model re-interprets the outfit on every processed
+frame, which looks like flickering. This demo has no temporal model, but these
+switches help:
+
+```bash
+python main.py \
+  --t-index 25,30,40 \
+  --no-add-noise \
+  --similar-image-filter --similar-image-filter-threshold 0.99 \
+  --similar-image-filter-max-skip 3 \
+  --smoothing 0.15
+```
+
+- `--similar-image-filter` reuses the previous output when the input frame is
+  nearly identical. Lower threshold = more skipping (more stable, more lag);
+  0.97~0.99 is a reasonable range; `--similar-image-filter-max-skip` prevents
+  freezing forever.
+- `--smoothing 0.15` blends 15% of the previous output; higher values reduce
+  flicker more but add ghosting/blur (0.3 already looks dreamy).
+- `--no-add-noise` removes the fixed noise from the stream buffer (the vid2vid
+  example uses this).
+- Make the prompt more specific, e.g. `both wearing identical white sailor
+  uniforms with black pleated skirts`, instead of `colorful` / `various`.
+- If the scene is static, the filter can hold the output until motion; if it
+  freezes too much, raise the threshold toward 1 or increase max-skip.
+
+For production-grade temporal consistency you need a video model
+(StreamV2V / AnimateDiff / ControlNet), not per-frame SD-Turbo img2img.
+
 ### Running with Docker
 
 ```bash

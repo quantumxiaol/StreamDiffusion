@@ -143,6 +143,11 @@ class Pipeline:
             f"Denoising: t_index={t_index_list}, "
             f"num_inference_steps={args.num_inference_steps}"
         )
+        print(
+            f"Stability: do_add_noise={args.do_add_noise}, "
+            f"smoothing={args.smoothing}, "
+            f"similar_image_filter={args.similar_image_filter}"
+        )
         if vae_id is not None:
             print(f"Tiny VAE: {vae_id}")
 
@@ -164,12 +169,16 @@ class Pipeline:
             use_denoising_batch=True,
             cfg_type="none",
             use_safety_checker=args.safety_checker,
-            # enable_similar_image_filter=True,
-            # similar_image_filter_threshold=0.98,
+            do_add_noise=args.do_add_noise,
+            enable_similar_image_filter=args.similar_image_filter,
+            similar_image_filter_threshold=args.similar_image_filter_threshold,
+            similar_image_filter_max_skip_frame=args.similar_image_filter_max_skip_frame,
             engine_dir=args.engine_dir,
             local_files_only=args.local_files_only,
         )
 
+        self.smoothing = max(0.0, min(0.9, args.smoothing))
+        self.prev_output: Image.Image | None = None
         self.last_prompt = default_prompt
         self.stream.prepare(
             prompt=default_prompt,
@@ -182,4 +191,11 @@ class Pipeline:
         image_tensor = self.stream.preprocess_image(params.image)
         output_image = self.stream(image=image_tensor, prompt=params.prompt)
 
+        if self.smoothing > 0 and self.prev_output is not None:
+            output_image = Image.blend(
+                self.prev_output,
+                output_image,
+                alpha=1.0 - self.smoothing,
+            )
+        self.prev_output = output_image
         return output_image

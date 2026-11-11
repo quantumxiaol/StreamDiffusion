@@ -24,6 +24,11 @@ class Args(NamedTuple):
     local_files_only: bool
     t_index: str
     num_inference_steps: int
+    do_add_noise: bool
+    smoothing: float
+    similar_image_filter: bool
+    similar_image_filter_threshold: float
+    similar_image_filter_max_skip_frame: int
 
     def pretty_print(self):
         print("\n")
@@ -49,6 +54,15 @@ VAE = os.environ.get("VAE_ID") or os.environ.get("VAE")
 # Comma separated scheduler indices; None keeps the demo default [35, 45].
 T_INDEX = os.environ.get("T_INDEX")
 NUM_INFERENCE_STEPS = int(os.environ.get("NUM_INFERENCE_STEPS", 50))
+DO_ADD_NOISE = os.environ.get("DO_ADD_NOISE", "True") == "True"
+SMOOTHING = float(os.environ.get("SMOOTHING", 0.0))
+SIMILAR_IMAGE_FILTER = os.environ.get("SIMILAR_IMAGE_FILTER", "False") == "True"
+SIMILAR_IMAGE_FILTER_THRESHOLD = float(
+    os.environ.get("SIMILAR_IMAGE_FILTER_THRESHOLD", 0.98)
+)
+SIMILAR_IMAGE_FILTER_MAX_SKIP = int(
+    os.environ.get("SIMILAR_IMAGE_FILTER_MAX_SKIP", 10)
+)
 
 default_host = os.getenv("HOST", "0.0.0.0")
 default_port = int(os.getenv("PORT", "7860"))
@@ -181,6 +195,52 @@ parser.add_argument(
     type=int,
     default=NUM_INFERENCE_STEPS,
     help="Scheduler steps used to resolve --t-index (default: 50).",
+)
+parser.add_argument(
+    "--do-add-noise",
+    dest="do_add_noise",
+    action="store_true",
+    default=DO_ADD_NOISE,
+    help="Add fixed noise to the stream buffer (default: on).",
+)
+parser.add_argument(
+    "--no-add-noise",
+    dest="do_add_noise",
+    action="store_false",
+    help="Disable stream-buffer noise; often reduces clothing flicker.",
+)
+parser.add_argument(
+    "--smoothing",
+    type=float,
+    default=SMOOTHING,
+    help=(
+        "Blend each output with the previous frame, 0..0.9 (default: 0). "
+        "Try 0.1-0.2 to reduce flicker; higher values add motion ghosting."
+    ),
+)
+parser.add_argument(
+    "--similar-image-filter",
+    dest="similar_image_filter",
+    action="store_true",
+    default=SIMILAR_IMAGE_FILTER,
+    help=(
+        "Skip inference for nearly identical input frames and reuse the "
+        "previous output; useful for mostly static camera scenes."
+    ),
+)
+parser.add_argument(
+    "--similar-image-filter-threshold",
+    dest="similar_image_filter_threshold",
+    type=float,
+    default=SIMILAR_IMAGE_FILTER_THRESHOLD,
+    help="Cosine similarity threshold for --similar-image-filter (default: 0.98).",
+)
+parser.add_argument(
+    "--similar-image-filter-max-skip",
+    dest="similar_image_filter_max_skip_frame",
+    type=int,
+    default=SIMILAR_IMAGE_FILTER_MAX_SKIP,
+    help="Maximum consecutive skipped frames (default: 10).",
 )
 parser.add_argument(
     "--local-files-only",
