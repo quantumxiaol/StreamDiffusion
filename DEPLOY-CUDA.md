@@ -113,35 +113,53 @@ ls demo/realtime-img2img/frontend/public/index.html
 
 ### 如果代码是 GitHub zip 解压的（没有 `.git`）
 
-zip 里没有版本历史。在项目目录执行下面几步，就能变成和 `git clone` 一样的状态：
+zip 里没有 `.git`。目标是**复用已经解压的文件**，只从远端拉提交/目录树信息，
+然后让 HEAD/index 指向 `origin/main`，而不是把文件内容重新下载一遍：
 
 ```bash
 cd StreamDiffusion
 
 git init -b main
 git remote add origin https://github.com/quantumxiaol/StreamDiffusion.git
-git fetch origin
-git reset --hard origin/main
+
+# 只拉 commit 和 tree，不拉文件 blob（GitHub 支持 partial clone）
+git fetch --filter=blob:none origin
+
+# 关键：mixed reset（默认模式），只移动 HEAD 和 index，不动工作区文件
+git reset origin/main
 git branch --set-upstream-to=origin/main main
 
 git status -sb   # 应该显示 ## main...origin/main
 ```
 
-`git reset --hard` 会把 tracked 文件对齐到远端 `main`，但**不会删除**：
+如果 zip 里的文件和 `origin/main` 完全一致，`git status` 直接是干净的，
+**不会重新下载或覆盖任何已解压的文件**。`.git/objects` 里只有 commit/tree，
+没有文件 blob；需要看历史时 Git 会按需从 promisor remote 拉取。
 
-- `.venv/`
-- `models/`
-- `.env`
-- `engines/`
+如果 zip 比远端旧，`git status` 会显示部分文件 `modified` 或 `deleted`。
+这时只恢复这些文件即可（Git 只按需拉取它们对应的 blob）：
 
-因为这些都在 `.gitignore` 里，ignored 文件不受 `reset --hard` 影响。
+```bash
+git restore path/to/changed-file
+# 或者把所有 tracked 文件对齐到远端（只下载差异部分）
+git restore .
+```
 
-> **不要**执行 `git clean -fdx`，它会连 `.venv` 和 `models` 一起删掉。
-> 如果 `git status` 里有多余的非 ignored 文件，先看清单，再决定是否用
-> `git clean -fd`（不带 `x`）。
->
-> 如果远端默认分支不叫 `main`，把上面的 `origin/main` 换成 `origin/master`。
-> 如果以后想保留本地修改，先备份再 reset。
+注意：
+
+- `git reset --hard` 会从远端重新 checkout 所有 tracked 文件，相当于把代码
+  内容又下载/写了一遍；只想复用现有文件时用 `git reset`（mixed）。
+- `--filter=blob:none` 会自动把 `origin` 标成 promisor remote，之后
+  `git status`/`git log` 可能出现 “Some objects may not be loaded” 的提示，
+  这是 partial clone 的正常提示。
+- 如果远端不支持 filter，Git 会警告并退回完整 fetch，结果仍然正确，只是会
+  多下载一些对象。
+- 不加 `--depth` 会保留完整提交历史；只想看最新状态可以加 `--depth 1`，
+  但那样历史是 shallow 的。
+- `.venv/`、`models/`、`.env`、`engines/` 都在 `.gitignore` 里，不会被 reset
+  或 restore 影响。
+- **不要**执行 `git clean -fdx`，它会连 `.venv` 和 `models` 一起删掉。
+- 如果远端默认分支不叫 `main`，把 `origin/main` 换成 `origin/master`。
 
 ---
 
