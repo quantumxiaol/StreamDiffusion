@@ -95,9 +95,6 @@ Use `--model /path/to/model` or `--vae /path/to/taesd` to load custom weights.
 TensorRT, xformers and StableFast are CUDA-only; the demo skips them on
 MPS/CPU instead of printing a traceback.
 
-To move this demo (with the downloaded models) to an NVIDIA machine, see
-[`DEPLOY-CUDA.md`](../../DEPLOY-CUDA.md). Do not copy the macOS `.venv`.
-
 ### Effect strength
 
 The default `t_index_list=[35, 45]` is intentionally subtle: it only applies
@@ -120,6 +117,33 @@ More steps = lower FPS. On a 2080 Ti, 3 steps such as
 > SD-Turbo is a photorealistic model. Strong denoising can make the result
 > stylized, but for a real anime look use an anime fine-tuned SD1.5 model with
 > LCM-LoRA (the `demo/realtime-txt2img` setup) instead of SD-Turbo.
+
+### Making the effect obvious
+
+A static portrait is the hardest case to judge: with the default subtle
+`t_index`, the output intentionally looks almost like the input. For a demo
+where the change is clearly visible, use a **moving, full-body scene** and a
+stronger denoising setting:
+
+1. Play a short video with people interacting in a window or browser tab
+   (handshake, high-five, dance, passing an object, interview).
+2. Start the demo, then click the **Share** button on the video panel and pick
+   that window/tab (browser screen capture).
+3. Use a scene-level prompt that changes both clothing and background, not
+   just a clothing word. For example:
+   - `two people shaking hands, wearing colorful Japanese anime school uniforms, cherry blossom background, anime illustration, vibrant colors, detailed line art, masterpiece`
+   - `two dancers in neon cyberpunk kimonos, glowing city background, anime style, dynamic pose, vibrant colors, detailed line art`
+   - `two friends high-fiving, wearing Japanese streetwear, anime style, summer festival background, detailed illustration`
+4. Start with `--t-index 0,10,20,30`; if it flickers too much, back off to
+   `--t-index 10,20,30,40`.
+
+Tips: full body and visible hands work better than a tight face shot; a
+consistent background and even lighting help; avoid fast cuts. Screen capture
+requires HTTPS or `localhost`, so use the SSH tunnel if the demo is remote.
+
+> For a true 2D anime look, SD-Turbo is still a photorealistic base model.
+> The better model choice is an anime fine-tuned SD1.5 checkpoint with
+> LCM-LoRA (the setup used by `demo/realtime-txt2img`).
 
 ### Running with Docker
 

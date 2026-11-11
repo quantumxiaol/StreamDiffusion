@@ -179,10 +179,6 @@ See `python scripts/download_models.py --help` and
 [`demo/realtime-img2img/README.md`](./demo/realtime-img2img/README.md) for
 device selection and offline options.
 
-To package the project (including `models/`) and deploy it to an NVIDIA
-machine, follow [`DEPLOY-CUDA.md`](./DEPLOY-CUDA.md). Do **not** copy the
-macOS `.venv`; recreate the environment on the target machine.
-
 ## Quick Start
 
 You can try StreamDiffusion in [`examples`](./examples) directory.

@@ -1,7 +1,7 @@
 # Runtime dependencies for demo/realtime-img2img on CUDA machines.
 #
 # PyTorch must be installed FIRST with the correct CUDA wheel, otherwise pip
-# may replace it with a CPU build. See DEPLOY-CUDA.md for the full procedure:
+# may replace it with a CPU build. For example:
 #
 #   pip install torch==2.5.1 torchvision==0.20.1 \
 #       --index-url https://download.pytorch.org/whl/cu121
