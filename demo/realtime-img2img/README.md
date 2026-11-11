@@ -120,6 +120,10 @@ More steps = lower FPS. On a 2080 Ti, 3 steps such as
 
 ### Making the effect obvious
 
+The default prompt is the single-person "turn into a JK high school girl"
+transformation (white sailor uniform, black pleated skirt). The two-person
+prompts below are only optional interaction-scene examples.
+
 A static portrait is the hardest case to judge: with the default subtle
 `t_index`, the output intentionally looks almost like the input. For a demo
 where the change is clearly visible, use a **moving, full-body scene** and a

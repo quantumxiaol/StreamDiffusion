@@ -81,7 +81,7 @@ def parse_t_index(value: str, num_inference_steps: int) -> list[int]:
     return indices
 
 
-default_prompt = "Anime style portrait of a girl wearing a Japanese school uniform, sailor collar, pleated skirt, detailed anime illustration, vibrant colors, clean line art, cinematic lighting, masterpiece"
+default_prompt = "Anime style portrait of a single person transformed into a Japanese JK high school girl, wearing a white sailor uniform with a black pleated skirt, detailed anime illustration, clean line art, cinematic lighting, masterpiece"
 default_negative_prompt = "black and white, blurry, low resolution, pixelated,  pixel art, low quality, low fidelity"
 
 page_content = """<h1 class="text-3xl font-bold">StreamDiffusion</h1>

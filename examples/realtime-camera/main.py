@@ -23,7 +23,7 @@ from utils.device import get_device, get_dtype, resolve_acceleration
 
 # Demo 的默认配置
 base_model = "stabilityai/sd-turbo"
-default_prompt = "Anime style portrait of a girl wearing a Japanese school uniform, sailor collar, pleated skirt, detailed anime illustration, vibrant colors, clean line art, cinematic lighting, masterpiece"
+default_prompt = "Anime style portrait of a single person transformed into a Japanese JK high school girl, wearing a white sailor uniform with a black pleated skirt, detailed anime illustration, clean line art, cinematic lighting, masterpiece"
 default_negative_prompt = "black and white, blurry, low resolution, pixelated,  pixel art, low quality, low fidelity"
 
 
