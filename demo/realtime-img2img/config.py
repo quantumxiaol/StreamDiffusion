@@ -17,6 +17,11 @@ class Args(NamedTuple):
     debug: bool
     acceleration: str
     engine_dir: str
+    device: str
+    dtype: str
+    model: str
+    vae: str
+    local_files_only: bool
 
     def pretty_print(self):
         print("\n")
@@ -30,7 +35,15 @@ TIMEOUT = float(os.environ.get("TIMEOUT", 0))
 SAFETY_CHECKER = os.environ.get("SAFETY_CHECKER", None) == "True"
 USE_TAESD = os.environ.get("USE_TAESD", "True") == "True"
 ENGINE_DIR = os.environ.get("ENGINE_DIR", "engines")
-ACCELERATION = os.environ.get("ACCELERATION", "tensorrt")
+ACCELERATION = os.environ.get("ACCELERATION", "auto")
+
+# "auto" resolves to CUDA -> MPS -> CPU in utils/device.py.
+DEVICE = os.environ.get("DEVICE", "auto")
+DTYPE = os.environ.get("DTYPE", "auto")
+# Optional explicit paths/ids. When unset, img2img.py uses models/<name> if it
+# has been downloaded, otherwise it falls back to the Hugging Face model id.
+MODEL = os.environ.get("MODEL_ID") or os.environ.get("MODEL")
+VAE = os.environ.get("VAE_ID") or os.environ.get("VAE")
 
 default_host = os.getenv("HOST", "0.0.0.0")
 default_port = int(os.getenv("PORT", "7860"))
@@ -94,8 +107,11 @@ parser.add_argument(
     "--acceleration",
     type=str,
     default=ACCELERATION,
-    choices=["none", "xformers", "sfast", "tensorrt"],
-    help="Acceleration",
+    choices=["auto", "none", "xformers", "sfast", "tensorrt"],
+    help=(
+        "Acceleration backend. 'auto' enables xformers on CUDA when installed "
+        "and disables acceleration on MPS/CPU."
+    ),
 )
 parser.add_argument(
     "--engine-dir",
@@ -103,6 +119,51 @@ parser.add_argument(
     type=str,
     default=ENGINE_DIR,
     help="Engine Dir",
+)
+parser.add_argument(
+    "--device",
+    type=str,
+    default=DEVICE,
+    help=(
+        "Device: 'auto' (default), 'cuda', 'cuda:0', 'mps' or 'cpu'. "
+        "An unavailable device falls back to auto-detection."
+    ),
+)
+parser.add_argument(
+    "--dtype",
+    type=str,
+    default=DTYPE,
+    help=(
+        "Inference dtype: 'auto' (default), 'float16', 'bfloat16' or 'float32'. "
+        "float16 is used on CUDA/MPS, float32 on CPU."
+    ),
+)
+parser.add_argument(
+    "--model",
+    dest="model",
+    type=str,
+    default=MODEL,
+    help=(
+        "Model id or local path. Defaults to models/sd-turbo when it exists, "
+        "otherwise stabilityai/sd-turbo."
+    ),
+)
+parser.add_argument(
+    "--vae",
+    dest="vae",
+    type=str,
+    default=VAE,
+    help=(
+        "Tiny VAE id or local path. Defaults to models/taesd when it exists, "
+        "otherwise madebyollin/taesd."
+    ),
+)
+parser.add_argument(
+    "--local-files-only",
+    dest="local_files_only",
+    action="store_true",
+    default=False,
+    help="Never download from Hugging Face (run the download script first).",
 )
 parser.set_defaults(taesd=USE_TAESD)
 config = Args(**vars(parser.parse_args()))

@@ -1,7 +1,6 @@
 from dataclasses import dataclass, field
 from typing import List, Literal
 
-import torch
 import os
 
 SAFETY_CHECKER = os.environ.get("SAFETY_CHECKER", "False") == "True"
@@ -33,12 +32,14 @@ class Config:
     lcm_lora_id: str = os.environ.get("LORA", "latent-consistency/lcm-lora-sdv1-5")
     # TinyVAE model
     vae_id: str = os.environ.get("VAE", "madebyollin/taesd")
-    # Device to use
-    device: torch.device = torch.device("cuda")
-    # Data type
-    dtype: torch.dtype = torch.float16
-    # acceleration
-    acceleration: Literal["none", "xformers", "tensorrt"] = "xformers"
+    # Device to use: "auto" -> CUDA, then MPS, then CPU
+    device: str = os.environ.get("DEVICE", "auto")
+    # Data type: "auto" -> float16 on CUDA/MPS, float32 on CPU
+    dtype: str = os.environ.get("DTYPE", "auto")
+    # acceleration: "auto" -> xformers on CUDA when available, otherwise none
+    acceleration: Literal["auto", "none", "xformers", "tensorrt"] = os.environ.get(
+        "ACCELERATION", "auto"
+    )
 
     ####################################################################
     # Inference configuration

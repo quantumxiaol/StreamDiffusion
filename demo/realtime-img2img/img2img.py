@@ -8,6 +8,14 @@ sys.path.append(
         "..",
     )
 )
+sys.path.append(
+    os.path.join(
+        os.path.dirname(__file__),
+        "..",
+        "..",
+        "src",
+    )
+)
 
 from utils.wrapper import StreamDiffusionWrapper
 
@@ -17,9 +25,40 @@ from config import Args
 from pydantic import BaseModel, Field
 from PIL import Image
 import math
+from pathlib import Path
 
 base_model = "stabilityai/sd-turbo"
 taesd_model = "madebyollin/taesd"
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+MODEL_DIR = PROJECT_ROOT / "models"
+
+
+def resolve_model_path(args: Args) -> str:
+    """Prefer a model downloaded by scripts/download_models.py."""
+
+    if args.model:
+        return args.model
+    local_path = MODEL_DIR / "sd-turbo"
+    if (local_path / "model_index.json").is_file() and any(
+        local_path.glob("**/*.safetensors")
+    ):
+        return str(local_path)
+    return base_model
+
+
+def resolve_vae_path(args: Args) -> str:
+    """Prefer a local TinyVAE, otherwise fall back to the Hub model id."""
+
+    if args.vae:
+        return args.vae
+    local_path = MODEL_DIR / "taesd"
+    if (local_path / "config.json").is_file() and any(
+        local_path.glob("*.safetensors")
+    ):
+        return str(local_path)
+    return taesd_model
+
 
 default_prompt = "Portrait of The Joker halloween costume, face painting, with , glare pose, detailed, intricate, full of colour, cinematic lighting, trending on artstation, 8k, hyperrealistic, focused, extreme details, unreal engine 5 cinematic, masterpiece"
 default_negative_prompt = "black and white, blurry, low resolution, pixelated,  pixel art, low quality, low fidelity"
@@ -71,8 +110,14 @@ class Pipeline:
 
     def __init__(self, args: Args, device: torch.device, torch_dtype: torch.dtype):
         params = self.InputParams()
+        model_id_or_path = resolve_model_path(args)
+        vae_id = resolve_vae_path(args) if args.taesd else None
+        print(f"Model: {model_id_or_path}")
+        if vae_id is not None:
+            print(f"Tiny VAE: {vae_id}")
+
         self.stream = StreamDiffusionWrapper(
-            model_id_or_path=base_model,
+            model_id_or_path=model_id_or_path,
             use_tiny_vae=args.taesd,
             device=device,
             dtype=torch_dtype,
@@ -83,7 +128,7 @@ class Pipeline:
             use_lcm_lora=False,
             output_type="pil",
             warmup=10,
-            vae_id=None,
+            vae_id=vae_id,
             acceleration=args.acceleration,
             mode="img2img",
             use_denoising_batch=True,
@@ -92,6 +137,7 @@ class Pipeline:
             # enable_similar_image_filter=True,
             # similar_image_filter_threshold=0.98,
             engine_dir=args.engine_dir,
+            local_files_only=args.local_files_only,
         )
 
         self.last_prompt = default_prompt

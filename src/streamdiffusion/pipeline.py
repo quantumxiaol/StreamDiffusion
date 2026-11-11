@@ -65,6 +65,7 @@ class StreamDiffusion:
         self.similar_image_filter = False
         self.similar_filter = SimilarImageFilter()
         self.prev_image_result = None
+        self._buffer_fresh = False
 
         self.pipe = pipe
         self.image_processor = VaeImageProcessor(pipe.vae_scale_factor)
@@ -133,20 +134,12 @@ class StreamDiffusion:
     ) -> None:
         self.generator = generator
         self.generator.manual_seed(seed)
-        # initialize x_t_latent (it can be any random tensor)
-        if self.denoising_steps_num > 1:
-            self.x_t_latent_buffer = torch.zeros(
-                (
-                    (self.denoising_steps_num - 1) * self.frame_bff_size,
-                    4,
-                    self.latent_height,
-                    self.latent_width,
-                ),
-                dtype=self.dtype,
-                device=self.device,
-            )
-        else:
-            self.x_t_latent_buffer = None
+        # The latent buffer is initialized from init_noise once the noise is
+        # created below. For img2img, encode_image() replaces it with latents
+        # derived from the first input frame so frame 0 is not decoded from
+        # zeros (which used to produce a flat/blank first frame).
+        self.x_t_latent_buffer = None
+        self._buffer_fresh = True
 
         if self.cfg_type == "none":
             self.guidance_scale = 1.0
@@ -200,6 +193,26 @@ class StreamDiffusion:
             (self.batch_size, 4, self.latent_height, self.latent_width),
             generator=generator,
         ).to(device=self.device, dtype=self.dtype)
+
+        if self.denoising_steps_num > 1:
+            if self.frame_bff_size == 1:
+                # Bootstrap the stream batch with noise at the later timesteps.
+                # encode_image() overwrites this for img2img with the first frame.
+                self.x_t_latent_buffer = self.init_noise[1:].clone()
+            else:
+                # Keep the historical shape for frame_buffer_size > 1.
+                self.x_t_latent_buffer = torch.zeros(
+                    (
+                        (self.denoising_steps_num - 1) * self.frame_bff_size,
+                        4,
+                        self.latent_height,
+                        self.latent_width,
+                    ),
+                    dtype=self.dtype,
+                    device=self.device,
+                )
+        else:
+            self.x_t_latent_buffer = None
 
         self.stock_noise = torch.zeros_like(self.init_noise)
 
@@ -378,6 +391,21 @@ class StreamDiffusion:
         img_latent = retrieve_latents(self.vae.encode(image_tensors), self.generator)
         img_latent = img_latent * self.vae.config.scaling_factor
         x_t_latent = self.add_noise(img_latent, self.init_noise[0], 0)
+
+        if self._buffer_fresh:
+            if self.frame_bff_size == 1 and self.x_t_latent_buffer is not None:
+                # Use the first input frame for every timestep of the stream
+                # batch. Previously the buffer was all zeros, so the very first
+                # frame was decoded from a zero latent and came out blank.
+                self.x_t_latent_buffer = torch.cat(
+                    [
+                        self.add_noise(img_latent, self.init_noise[i], i)
+                        for i in range(1, self.denoising_steps_num)
+                    ],
+                    dim=0,
+                )
+            self._buffer_fresh = False
+
         return x_t_latent
 
     def decode_image(self, x_0_pred_out: torch.Tensor) -> torch.Tensor:

@@ -23,8 +23,10 @@ npm i
 npm run build
 cd ..
 pip install -r requirements.txt
-python main.py  --acceleration tensorrt
+python main.py
 ```
+
+モデルのダウンロード、デバイス（CUDA / MPS / CPU）の自動選択、オフライン実行などの詳細は [README.md](./README.md) を参照してください。
 
 or
 

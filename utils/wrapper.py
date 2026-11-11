@@ -12,10 +12,13 @@ from PIL import Image
 from streamdiffusion import StreamDiffusion
 from streamdiffusion.image_utils import postprocess_image
 
+from .device import get_device, get_dtype, resolve_acceleration
+
 
 torch.set_grad_enabled(False)
-torch.backends.cuda.matmul.allow_tf32 = True
-torch.backends.cudnn.allow_tf32 = True
+if torch.cuda.is_available():
+    torch.backends.cuda.matmul.allow_tf32 = True
+    torch.backends.cudnn.allow_tf32 = True
 
 
 class StreamDiffusionWrapper:
@@ -28,7 +31,7 @@ class StreamDiffusionWrapper:
         output_type: Literal["pil", "pt", "np", "latent"] = "pil",
         lcm_lora_id: Optional[str] = None,
         vae_id: Optional[str] = None,
-        device: Optional[Literal["cpu", "cuda", "mps"]] = None,
+        device: Optional[Union[str, torch.device]] = None,
         dtype: torch.dtype = torch.float16,
         frame_buffer_size: int = 1,
         width: int = 512,
@@ -47,6 +50,7 @@ class StreamDiffusionWrapper:
         seed: int = 2,
         use_safety_checker: bool = False,
         engine_dir: Optional[Union[str, Path]] = "engines",
+        local_files_only: bool = False,
     ):
         """
         Initializes the StreamDiffusionWrapper.
@@ -73,10 +77,13 @@ class StreamDiffusionWrapper:
             The vae_id to load, by default None.
             If None, the default TinyVAE
             ("madebyollin/taesd") will be used.
-        device : Literal["cpu", "cuda"], optional
-            The device to use for inference, by default "cuda".
+        device : Optional[Union[str, torch.device]], optional
+            The device to use for inference. When None, CUDA is preferred,
+            then MPS, then CPU. An unavailable explicit device falls back to
+            auto-detection, by default None.
         dtype : torch.dtype, optional
             The dtype for inference, by default torch.float16.
+            float16 is automatically downgraded to float32 on CPU.
         frame_buffer_size : int, optional
             The frame buffer size for denoising batch, by default 1.
         width : int, optional
@@ -113,8 +120,12 @@ class StreamDiffusionWrapper:
             The seed, by default 2.
         use_safety_checker : bool, optional
             Whether to use safety checker or not, by default False.
+        local_files_only : bool, optional
+            Never reach out to Hugging Face. Use this after running
+            ``scripts/download_models.py`` for fully offline inference,
+            by default False.
         """
-        self.sd_turbo = "turbo" in model_id_or_path
+        self.sd_turbo = "turbo" in Path(model_id_or_path).name.lower()
 
         if mode == "txt2img":
             if cfg_type != "none":
@@ -133,18 +144,17 @@ class StreamDiffusionWrapper:
                     "img2img mode must use denoising batch for now."
                 )
 
-        # Auto-detect device if not specified
-        if device is None:
-            if torch.cuda.is_available():
-                device = "cuda"
-            elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
-                device = "mps"
-            else:
-                device = "cpu"
-        
-        self.device = device
-        print(f"Using device: {device}")
-        self.dtype = dtype
+        # Auto-detect device if not specified. Explicit but unavailable
+        # devices fall back to auto-detection (see utils/device.py).
+        self.device = get_device(device)
+        self.dtype = get_dtype(self.device, dtype)
+        self.acceleration = resolve_acceleration(acceleration, self.device)
+        print(
+            "Using device: "
+            f"{self.device} ({str(self.dtype).replace('torch.', '')}, "
+            f"acceleration={self.acceleration})"
+        )
+        self.local_files_only = local_files_only
         self.width = width
         self.height = height
         self.mode = mode
@@ -165,7 +175,7 @@ class StreamDiffusionWrapper:
             lcm_lora_id=lcm_lora_id,
             vae_id=vae_id,
             t_index_list=t_index_list,
-            acceleration=acceleration,
+            acceleration=self.acceleration,
             warmup=warmup,
             do_add_noise=do_add_noise,
             use_lcm_lora=use_lcm_lora,
@@ -173,6 +183,7 @@ class StreamDiffusionWrapper:
             cfg_type=cfg_type,
             seed=seed,
             engine_dir=engine_dir,
+            local_files_only=local_files_only,
         )
 
         if device_ids is not None:
@@ -357,6 +368,24 @@ class StreamDiffusionWrapper:
         else:
             return postprocess_image(image_tensor.cpu(), output_type=output_type)[0]
 
+    @staticmethod
+    def _detect_variant(
+        model_path: Path, dtype: Optional[torch.dtype] = None
+    ) -> Optional[str]:
+        """Return the diffusers weight variant available in a local model dir."""
+
+        if not model_path.is_dir():
+            return None
+        unet_dir = model_path / "unet"
+        if not (unet_dir / "diffusion_pytorch_model.fp16.safetensors").is_file():
+            return None
+        # When both variants exist, prefer full precision for float32/bf16.
+        if dtype in (torch.float32, torch.bfloat16) and (
+            unet_dir / "diffusion_pytorch_model.safetensors"
+        ).is_file():
+            return None
+        return "fp16"
+
     def _load_model(
         self,
         model_id_or_path: str,
@@ -372,6 +401,7 @@ class StreamDiffusionWrapper:
         cfg_type: Literal["none", "full", "self", "initialize"] = "self",
         seed: int = 2,
         engine_dir: Optional[Union[str, Path]] = "engines",
+        local_files_only: bool = False,
     ) -> StreamDiffusion:
         """
         Loads the model.
@@ -416,6 +446,8 @@ class StreamDiffusionWrapper:
             You cannot use anything other than "none" for txt2img mode.
         seed : int, optional
             The seed, by default 2.
+        local_files_only : bool, optional
+            Never download from Hugging Face, by default False.
 
         Returns
         -------
@@ -423,19 +455,42 @@ class StreamDiffusionWrapper:
             The loaded model.
         """
 
-        try:  # Load from local directory
-            pipe: StableDiffusionPipeline = StableDiffusionPipeline.from_pretrained(
-                model_id_or_path,
-            ).to(device=self.device, dtype=self.dtype)
+        model_path = Path(model_id_or_path)
+        is_single_file = model_path.is_file() and model_path.suffix.lower() in {
+            ".safetensors",
+            ".ckpt",
+            ".bin",
+        }
+        # Locally downloaded fp16 models (see scripts/download_models.py) only
+        # ship *.fp16.safetensors, so tell diffusers which variant to read.
+        variant = self._detect_variant(model_path, self.dtype)
+        if variant is not None:
+            print(f"Loading '{variant}' weights from {model_path}")
 
-        except ValueError:  # Load from huggingface
-            pipe: StableDiffusionPipeline = StableDiffusionPipeline.from_single_file(
-                model_id_or_path,
-            ).to(device=self.device, dtype=self.dtype)
-        except Exception:  # No model found
+        try:
+            if is_single_file:
+                pipe: StableDiffusionPipeline = StableDiffusionPipeline.from_single_file(
+                    model_id_or_path,
+                    torch_dtype=self.dtype,
+                )
+            else:
+                pipe: StableDiffusionPipeline = StableDiffusionPipeline.from_pretrained(
+                    model_id_or_path,
+                    torch_dtype=self.dtype,
+                    variant=variant,
+                    local_files_only=local_files_only,
+                )
+            pipe = pipe.to(device=self.device, dtype=self.dtype)
+        except Exception as exc:
             traceback.print_exc()
-            print("Model load has failed. Doesn't exist.")
-            exit()
+            raise SystemExit(
+                f"Model load has failed: {model_id_or_path!r} ({exc}).\n"
+                "If you want to keep the model on disk (and avoid downloading "
+                "from Hugging Face on every start), run:\n"
+                "    python scripts/download_models.py --preset realtime-img2img\n"
+                "Then start the demo again, or use --local-files-only after the "
+                "download completes."
+            ) from exc
 
         stream = StreamDiffusion(
             pipe=pipe,
@@ -466,13 +521,22 @@ class StreamDiffusionWrapper:
 
         if use_tiny_vae:
             if vae_id is not None:
-                stream.vae = AutoencoderTiny.from_pretrained(vae_id).to(
-                    device=pipe.device, dtype=pipe.dtype
-                )
+                stream.vae = AutoencoderTiny.from_pretrained(
+                    vae_id, local_files_only=local_files_only
+                ).to(device=pipe.device, dtype=pipe.dtype)
             else:
-                stream.vae = AutoencoderTiny.from_pretrained("madebyollin/taesd").to(
-                    device=pipe.device, dtype=pipe.dtype
-                )
+                stream.vae = AutoencoderTiny.from_pretrained(
+                    "madebyollin/taesd", local_files_only=local_files_only
+                ).to(device=pipe.device, dtype=pipe.dtype)
+
+        # TensorRT / xformers are CUDA-only. Skip them early on MPS/CPU instead
+        # of producing a long, misleading traceback on every start.
+        if acceleration in ("tensorrt", "xformers") and self.device.type != "cuda":
+            print(
+                f"Acceleration '{acceleration}' requires CUDA; "
+                f"running on {self.device} without acceleration."
+            )
+            acceleration = "none"
 
         try:
             if acceleration == "xformers":
@@ -663,10 +727,12 @@ class StreamDiffusionWrapper:
             )
 
             self.safety_checker = StableDiffusionSafetyChecker.from_pretrained(
-                "CompVis/stable-diffusion-safety-checker"
+                "CompVis/stable-diffusion-safety-checker",
+                local_files_only=local_files_only,
             ).to(pipe.device)
             self.feature_extractor = CLIPFeatureExtractor.from_pretrained(
-                "openai/clip-vit-base-patch32"
+                "openai/clip-vit-base-patch32",
+                local_files_only=local_files_only,
             )
             self.nsfw_fallback_img = Image.new("RGB", (512, 512), (0, 0, 0))
 

@@ -10,16 +10,24 @@ import logging
 import uuid
 import time
 from types import SimpleNamespace
-import asyncio
-import os
-import time
 import mimetypes
-import torch
+import sys
+from pathlib import Path
+
+# Make the repository root (and src/ for a source checkout) importable when
+# running `python main.py` from this directory. Use append (not insert) so the
+# demo directory keeps precedence and `uvicorn` imports this `main` module
+# instead of the repository-root main.py.
+REPO_ROOT = Path(__file__).resolve().parents[2]
+for _path in (REPO_ROOT, REPO_ROOT / "src"):
+    if str(_path) not in sys.path:
+        sys.path.append(str(_path))
 
 from config import config, Args
 from util import pil_to_frame, bytes_to_pil
 from connection_manager import ConnectionManager, ServerFullException
 from img2img import Pipeline
+from utils.device import get_device, get_dtype, resolve_acceleration
 
 # fix mime error on windows
 mimetypes.add_type("application/javascript", ".js")
@@ -150,25 +158,37 @@ class App:
                 }
             )
 
-        if not os.path.exists("public"):
-            os.makedirs("public")
-
+        # Serve the built frontend relative to this file, not the current
+        # working directory, so `python demo/realtime-img2img/main.py` works
+        # from the repository root as well.
+        frontend_dir = Path(__file__).resolve().parent / "frontend" / "public"
+        frontend_dir.mkdir(parents=True, exist_ok=True)
         self.app.mount(
-            "/", StaticFiles(directory="./frontend/public", html=True), name="public"
+            "/", StaticFiles(directory=str(frontend_dir), html=True), name="public"
         )
 
 
-# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
-torch_dtype = torch.float16
+device = get_device(config.device)
+torch_dtype = get_dtype(device, config.dtype)
+acceleration = resolve_acceleration(config.acceleration, device)
+config = config._replace(acceleration=acceleration)
+print(
+    f"Using device: {device} "
+    f"(dtype={str(torch_dtype).replace('torch.', '')}, "
+    f"acceleration={acceleration})"
+)
 pipeline = Pipeline(config, device, torch_dtype)
 app = App(config, pipeline).app
 
 if __name__ == "__main__":
     import uvicorn
 
+    # Pass the app object directly unless we need the reloader: an import
+    # string ("main:app") makes uvicorn import this module a second time,
+    # which loads another copy of the diffusion model (very expensive on MPS).
+    app_target = "main:app" if config.reload else app
     uvicorn.run(
-        "main:app",
+        app_target,
         host=config.host,
         port=config.port,
         reload=config.reload,

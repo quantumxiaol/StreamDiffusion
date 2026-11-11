@@ -16,6 +16,7 @@ from PyQt6.QtGui import QImage, QPixmap
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
 
 from utils.wrapper import StreamDiffusionWrapper
+from utils.device import get_device, get_dtype, resolve_acceleration
 
 # Demo 的默认配置
 base_model = "stabilityai/sd-turbo"
@@ -273,14 +274,11 @@ class MainWindow(QMainWindow):
         
         self.status_label.setText("正在初始化...")
         
-        # 确定设备（按照 demo 的方式）
-        if torch.backends.mps.is_available():
-            device = torch.device("mps")
-        elif torch.cuda.is_available():
-            device = torch.device("cuda")
-        else:
-            device = torch.device("cpu")
-        torch_dtype = torch.float16
+        # Auto-detect the backend: CUDA -> MPS -> CPU.
+        device = get_device()
+        torch_dtype = get_dtype(device)
+        acceleration = resolve_acceleration("auto", device)
+        print(f"Using {device}, dtype={torch_dtype}, acceleration={acceleration}")
         
         # 启动摄像头线程
         self.camera_thread = CameraThread(camera_index=0)
@@ -295,7 +293,7 @@ class MainWindow(QMainWindow):
             height=512,
             device=device,
             torch_dtype=torch_dtype,
-            acceleration="none",  # 对于 MPS，使用 "none" 更安全
+            acceleration=acceleration,
             use_tiny_vae=True,
         )
         self.stream_thread.image_ready.connect(self.on_processed_image)

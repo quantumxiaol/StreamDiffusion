@@ -154,6 +154,35 @@ docker build -t stream-diffusion:latest -f Dockerfile .
 docker run --gpus all -it -v $(pwd):/home/ubuntu/streamdiffusion stream-diffusion:latest
 ```
 
+## Model Download
+
+Demos can download weights from Hugging Face on first run, but keeping them in
+`models/` makes startup faster and works offline. For the real-time img2img
+demo:
+
+```bash
+python scripts/download_models.py --preset realtime-img2img
+```
+
+This downloads `stabilityai/sd-turbo` and `madebyollin/taesd` into
+`models/sd-turbo` and `models/taesd`; the demo picks them up automatically.
+Use `--precision fp32` for full-precision weights. If you are behind a proxy or
+need a mirror:
+
+```bash
+export HTTPS_PROXY=http://127.0.0.1:7890
+# or
+export HF_ENDPOINT=https://hf-mirror.com
+```
+
+See `python scripts/download_models.py --help` and
+[`demo/realtime-img2img/README.md`](./demo/realtime-img2img/README.md) for
+device selection and offline options.
+
+To package the project (including `models/`) and deploy it to an NVIDIA
+machine, follow [`DEPLOY-CUDA.md`](./DEPLOY-CUDA.md). Do **not** copy the
+macOS `.venv`; recreate the environment on the target machine.
+
 ## Quick Start
 
 You can try StreamDiffusion in [`examples`](./examples) directory.

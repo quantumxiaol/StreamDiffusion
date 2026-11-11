@@ -207,4 +207,8 @@ __pycache__/
 models/RealESR*
 *.safetensors
 
-uv.lock
+# Local model downloads (scripts/download_models.py)
+models/sd-turbo/
+models/taesd/
+models/lcm-lora-sdv1-5/
+models/kohaku-v2.1/
